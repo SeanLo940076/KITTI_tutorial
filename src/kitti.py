@@ -6,11 +6,12 @@ from data_utils import *
 from publish_utils import *
 from kitti_util import *
 
+# 路徑設置
 DATA_PATH = '/home/sean/Documents/KITTI/2011_09_26_drive_0005_sync/'
 
 def compute_3d_box_cam2(h, w, l, x, y, z, yaw):
     """
-    Return : 3xn(8) in cam2 coordinate
+    Return : 3xn (n=8) in cam2 coordinate
     """
     # R 是旋轉矩陣(此為繞y軸旋轉)
     R = np.array([[np.cos(yaw), 0, np.sin(yaw)],[0, 1, 0], [-np.sin(yaw), 0,np.cos(yaw)]])
@@ -47,6 +48,7 @@ if __name__ == '__main__':
         types = np.array(df_tracking_frame['type'])
         boxes_2d = np.array(df_tracking_frame[['bbox_left', 'bbox_top', 'bbox_right', 'bbox_bottom']])
         boxes_3d = np.array(df_tracking_frame[['height', 'width', 'length', 'pos_x', 'pos_y', 'pos_z','rot_y']])
+        track_ids = np.array(df_tracking_frame['track_id'])
         
         corners_3d_velos = [] # define corners_3d_velos
         for box_3d in boxes_3d:
@@ -62,7 +64,7 @@ if __name__ == '__main__':
         # Publish data 
         publish_camera(cam_pub, bridge, image, boxes_2d, types)
         publish_point_cloud(pcl_pub, point_cloud)
-        publish_3dbox(box3d_pub, corners_3d_velos, types)
+        publish_3dbox(box3d_pub, corners_3d_velos, types, track_ids)
         publish_ego_car(ego_pub)
         publish_imu(imu_pub, imu_data)
         publish_gps(gps_pub, imu_data)

@@ -35,7 +35,7 @@ def publish_point_cloud(pcl_pub, point_cloud):
     header.frame_id = FARME_ID
     pcl_pub.publish(pcl2.create_cloud_xyz32(header, point_cloud[:, :3]))
 
-def publish_3dbox(box3d_pub, corners_3d_velos, types):
+def publish_3dbox(box3d_pub, corners_3d_velos, types, track_ids):
     marker_array = MarkerArray() # define marker's array
     for i, corners_3d_velo in enumerate(corners_3d_velos):
         marker = Marker()
@@ -67,6 +67,36 @@ def publish_3dbox(box3d_pub, corners_3d_velos, types):
             p2 = corners_3d_velo[l[1]]
             marker.points.append(Point(p2[0], p2[1], p2[2]))
         marker_array.markers.append(marker)
+
+        text_marker = Marker()
+        text_marker.header.frame_id = FARME_ID
+        text_marker.header.stamp = rospy.Time.now()
+
+        text_marker.id = i + 1000
+        text_marker.action = Marker.ADD
+        text_marker.lifetime = rospy.Duration(LIFETIME)
+        text_marker.type = Marker.TEXT_VIEW_FACING
+
+        p4 = corners_3d_velo[4]
+
+        text_marker.pose.position.x = p4[0]
+        text_marker.pose.position.y = p4[1]
+        text_marker.pose.position.z = p4[2] + 0.5
+
+        # text_marker.text = str(i)
+        text_marker.text = str(track_ids[i])
+
+        text_marker.scale.x = 1
+        text_marker.scale.y = 1
+        text_marker.scale.z = 1
+        
+        b, g, r =  DETECTION_COLOR_DICT[types[i]]
+        text_marker.color.r = r/255.0
+        text_marker.color.g = g/255.0
+        text_marker.color.b = b/255.0
+        text_marker.color.a = 1.0
+        marker_array.markers.append(text_marker)
+
     box3d_pub.publish(marker_array)
 
 def publish_ego_car(ego_car_pub):

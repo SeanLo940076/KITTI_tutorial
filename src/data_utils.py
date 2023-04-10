@@ -11,7 +11,7 @@ IMU_COLUMN_NAMES  = [ 'lat' , 'lon' , 'alt' , 'roll' , 'pitch' , 'yaw' , 'vn' , 
                     'al' , 'au' , 'wx' , 'wy' , 'wz' , 'wf' , 'wl' , 'wu' , 'posacc' , 'velacc' , 'navstat' , 'numsats' , 'posmode ' ,
                     'velmode' , 'orimode' ]
 
-TRACKING_COLUMN_NAMES = ['frame', 'track id', 'type', 'truncated', 'occluded', 'alpha', 'bbox_left', 'bbox_top',
+TRACKING_COLUMN_NAMES = ['frame', 'track_id', 'type', 'truncated', 'occluded', 'alpha', 'bbox_left', 'bbox_top',
                         'bbox_right', 'bbox_bottom', 'height', 'width', 'length', 'pos_x', 'pos_y', 'pos_z', 'rot_y']
 
 def read_camera(path):
