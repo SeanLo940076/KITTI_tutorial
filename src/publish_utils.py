@@ -47,15 +47,15 @@ def publish_3dbox(box3d_pub, corners_3d_velos, types, track_ids):
         marker.lifetime = rospy.Duration(LIFETIME)
         marker.type = Marker.LINE_LIST
 
-        if types is None:
-            marker.color.r = 0.0
-            marker.color.g = 1.0
-            marker.color.b = 1.0
-        else:
-            b, g, r =  DETECTION_COLOR_DICT[types[i]]
-            marker.color.r = r/255.0
-            marker.color.g = g/255.0
-            marker.color.b = b/255.0
+        # if types is None:
+        #     marker.color.r = 0.0
+        #     marker.color.g = 1.0
+        #     marker.color.b = 1.0
+        # else:
+        b, g, r =  DETECTION_COLOR_DICT[types[i]]
+        marker.color.r = r/255.0
+        marker.color.g = g/255.0
+        marker.color.b = b/255.0
 
         marker.color.a = 1.0
         marker.scale.x = 0.1
@@ -77,11 +77,12 @@ def publish_3dbox(box3d_pub, corners_3d_velos, types, track_ids):
         text_marker.lifetime = rospy.Duration(LIFETIME)
         text_marker.type = Marker.TEXT_VIEW_FACING
 
-        p4 = corners_3d_velo[4]
+        # p4 = corners_3d_velo[4]
+        p = np.mean(corners_3d_velo, axis=0) # center
 
-        text_marker.pose.position.x = p4[0]
-        text_marker.pose.position.y = p4[1]
-        text_marker.pose.position.z = p4[2] + 0.5
+        text_marker.pose.position.x = p[0]
+        text_marker.pose.position.y = p[1]
+        text_marker.pose.position.z = p[2] + 1.5
 
         # text_marker.text = str(i)
         text_marker.text = str(track_ids[i])
@@ -111,7 +112,7 @@ def publish_ego_car(ego_car_pub):
 
     marker.id = 0
     marker.action = Marker.ADD
-    marker.lifetime = rospy.Duration()
+    marker.lifetime = rospy.Duration(0)
     marker.type = Marker.LINE_STRIP
 
     marker.color.r = 0.0
@@ -132,7 +133,7 @@ def publish_ego_car(ego_car_pub):
     mesh_marker.header.stamp = rospy.Time.now()
 
     mesh_marker.id = -1
-    mesh_marker.lifetime = rospy.Duration()
+    mesh_marker.lifetime = rospy.Duration(0)
     mesh_marker.type = Marker.MESH_RESOURCE
     mesh_marker.mesh_resource = "package://kitti_tutorial/bmw_x5/BMWX54.dae"
 
