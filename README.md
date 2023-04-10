@@ -11,7 +11,7 @@ Using ROS to visualize KITTI data and publish it in a ROS format for subsequent 
 
 ## Demo
 
-https://github.com/SeanLo940076/KITTI_tutorial/blob/main/Demo.gif
+![image](https://github.com/SeanLo940076/KITTI_tutorial/blob/main/Demo.gif)
 
 
 ## Running Tests
