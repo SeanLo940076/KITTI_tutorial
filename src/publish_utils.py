@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 
-import cv2
+# Yu Hsiang Lo  Final updated time : 2023/04/15
+# 此篇的功能為把得到的資訊轉為可用的資料格式
 
+import cv2
 import rospy
 import numpy as np
 from std_msgs.msg import Header
@@ -13,15 +15,18 @@ import sensor_msgs.point_cloud2 as pcl2
 from cv_bridge import CvBridge
 import tf
 
+# 定義時間常數與色彩
 FARME_ID = 'map'
 LIFETIME = 0.1
 DETECTION_COLOR_DICT = {'Car':(255,255,0), 'Pedestrian':(0,226,255), 'Cyclist':(140,40,255)}
 
-LINES  = [[0,1], [1,2], [2,3], [3,0]] # lower face
-LINES += [[4,5], [5,6], [6,7], [7,4]] # upper face
-LINES += [[4,0], [5,1], [6,2], [7,3]] # connect lower face and upper face
-LINES += [[4,1], [5,0]] # front face
+# 定義 3D box 框線的連接
+LINES  = [[0,1], [1,2], [2,3], [3,0]] # lower face 下半部面
+LINES += [[4,5], [5,6], [6,7], [7,4]] # upper face 上半部面
+LINES += [[4,0], [5,1], [6,2], [7,3]] # connect lower face and upper face 連接下半部和上半部面
+LINES += [[4,1], [5,0]] # front face 前面
 
+# 發布相機圖像
 def publish_camera(cam_pub, bridge, image, boxes_2d, types):
     for typ, box in zip(types, boxes_2d):
         top_left = int(box[0]),int(box[1])
@@ -29,14 +34,16 @@ def publish_camera(cam_pub, bridge, image, boxes_2d, types):
         cv2.rectangle(image, top_left, bottom_right, DETECTION_COLOR_DICT[typ], 2)
     cam_pub.publish(bridge.cv2_to_imgmsg(image, "bgr8"))
 
+# 發布點雲資料
 def publish_point_cloud(pcl_pub, point_cloud):
     header = Header()
     header.stamp = rospy.Time.now()
     header.frame_id = FARME_ID
     pcl_pub.publish(pcl2.create_cloud_xyz32(header, point_cloud[:, :3]))
 
+# 發布 3D 框線
 def publish_3dbox(box3d_pub, corners_3d_velos, types, track_ids):
-    marker_array = MarkerArray() # define marker's array
+    marker_array = MarkerArray() # define marker's array 可以放入所有的 array
     for i, corners_3d_velo in enumerate(corners_3d_velos):
         marker = Marker()
         marker.header.frame_id = FARME_ID
@@ -77,12 +84,13 @@ def publish_3dbox(box3d_pub, corners_3d_velos, types, track_ids):
         text_marker.lifetime = rospy.Duration(LIFETIME)
         text_marker.type = Marker.TEXT_VIEW_FACING
 
+        # 計算中心點
         # p4 = corners_3d_velo[4]
         p = np.mean(corners_3d_velo, axis=0) # center
 
         text_marker.pose.position.x = p[0]
         text_marker.pose.position.y = p[1]
-        text_marker.pose.position.z = p[2] + 1.5
+        text_marker.pose.position.z = p[2] + 1.5 # 提昇z軸高度 才能方便看到完整標記
 
         # text_marker.text = str(i)
         text_marker.text = str(track_ids[i])
@@ -100,10 +108,12 @@ def publish_3dbox(box3d_pub, corners_3d_velos, types, track_ids):
 
     box3d_pub.publish(marker_array)
 
+# 發布相機視野標記與自體車輛3D模型資訊
 def publish_ego_car(ego_car_pub):
     """
     Publish left and right 45 degree FOV lines and ego car model mesh
     """
+    # 1. 相機視野標記
     marker_array = MarkerArray()
 
     marker = Marker()
@@ -118,16 +128,17 @@ def publish_ego_car(ego_car_pub):
     marker.color.r = 0.0
     marker.color.g = 1.0
     marker.color.b = 0.0
-    marker.color.a = 1.0
-    marker.scale.x = 0.2
+    marker.color.a = 1.0    # 透明度
+    marker.scale.x = 0.2    # 縮放
 
     marker.points = [] # define marker.points
     marker.points.append(Point(10, -10, 0))
     marker.points.append(Point(0, 0, 0))
     marker.points.append(Point(10, 10, 0))
 
-    marker_array.markers.append(marker)
+    marker_array.markers.append(marker) # 將marker加入marker_array
 
+    # 2. 自體車輛3D模型
     mesh_marker = Marker()
     mesh_marker.header.frame_id = FARME_ID
     mesh_marker.header.stamp = rospy.Time.now()
@@ -139,8 +150,9 @@ def publish_ego_car(ego_car_pub):
 
     mesh_marker.pose.position.x = 0.0
     mesh_marker.pose.position.y = 0.0
-    mesh_marker.pose.position.z = -1.73
+    mesh_marker.pose.position.z = -1.73 # 這個是kitti中 感測器設置的高度
 
+    # 旋轉車體角度
     q = tf.transformations.quaternion_from_euler(np.pi/2, 0, np.pi)
     mesh_marker.pose.orientation.x = q[0]
     mesh_marker.pose.orientation.y = q[1]
@@ -160,11 +172,13 @@ def publish_ego_car(ego_car_pub):
 
     ego_car_pub.publish(marker_array)
 
+# 發布IMU資料
 def publish_imu(imu_pub, imu_data):
     imu = Imu()
     imu.header.frame_id = FARME_ID
     imu.header.stamp = rospy.Time.now()
 
+    # 歐拉角轉四元數
     q = tf.transformations.quaternion_from_euler(float(imu_data.roll), float(imu_data.pitch), float(imu_data.yaw))
     imu.orientation.x = q[0]
     imu.orientation.y = q[1]
@@ -179,6 +193,7 @@ def publish_imu(imu_pub, imu_data):
 
     imu_pub.publish(imu)
 
+# 發布GPS資料
 def publish_gps(gps_pub, imu_data):
     gps = NavSatFix()
     gps.header.frame_id = FARME_ID
