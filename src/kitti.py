@@ -47,7 +47,7 @@ class Object():
         self.locations.appendleft(np.array([0, 0])) # 第一幀永遠是(0, 0) 並且因為是自己的車，所以後面要加上的每一幀都是(0, 0)
 
     def reset(self):
-        self.locations = []
+        self.locations = deque(maxlen=20)
 
 
 if __name__ == '__main__':
