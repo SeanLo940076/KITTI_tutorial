@@ -10,6 +10,7 @@
 # 主程式很簡單 分為兩步驟 1. 建立資料發布的publish 跟建立資料來源路徑  2. 發布資料
 
 import os
+from collections import deque # google deque
 from data_utils import *
 from publish_utils import *
 from kitti_util import *
@@ -32,9 +33,26 @@ def compute_3d_box_cam2(h, w, l, x, y, z, yaw):
     corners_3d_cam2 += np.vstack([x, y, z])
     return corners_3d_cam2
 
+class Object():
+    def __init__(self):
+        self.locations = deque(maxlen=20) # 保留最近20幀就好
+
+    def update(self, displacement, yaw):
+        for i in range(len(self.locations)):
+            x0, y0 = self.locations[i]
+            x1 = x0 * np.cos(yaw_change) + y0 * np.sin(yaw_change) - displacement # x1 是新的x座標
+            y1 = -x0 * np.sin(yaw_change) + y0 * np.cos(yaw_change)
+            self.locations[i] = np.array([x1, y1])
+
+        self.locations.appendleft(np.array([0, 0])) # 第一幀永遠是(0, 0) 並且因為是自己的車，所以後面要加上的每一幀都是(0, 0)
+
+    def reset(self):
+        self.locations = []
+
+
 if __name__ == '__main__':
     # 初始化 ROS 節點
-    # Bulid data 
+    # First Bulid data 
     frame = 0
     rospy.init_node('kitti_node', anonymous=True)
     cam_pub = rospy.Publisher('kitti_cam', Image, queue_size=10)
@@ -43,6 +61,7 @@ if __name__ == '__main__':
     imu_pub = rospy.Publisher('kitti_imu', Imu, queue_size=10)
     gps_pub = rospy.Publisher('kitti_gps', NavSatFix, queue_size=10)
     box3d_pub = rospy.Publisher('kitti_3d', MarkerArray, queue_size=10)
+    loc_pub = rospy.Publisher('kitti_loc', MarkerArray, queue_size=10)
     bridge = CvBridge()
 
     rate = rospy.Rate(10)
@@ -50,6 +69,9 @@ if __name__ == '__main__':
     # 讀取 TRACKING 資料和 Calibration 資料
     df_tracking = read_tracking('/home/sean/Documents/KITTI/training/label_02/0000.txt')
     calib = Calibration('/home/sean/Documents/KITTI/2011_09_26_calib/2011_09_26/', from_video=True) 
+
+    ego_car = Object()
+    prev_imu_data = None
 
     # 在 ROS 中循環發布資料
     while not rospy.is_shutdown():
@@ -72,6 +94,14 @@ if __name__ == '__main__':
         point_cloud = read_point_cloud(os.path.join(DATA_PATH, 'velodyne_points/data/%010d.bin'%frame))
         imu_data = read_imu(os.path.join(DATA_PATH, 'oxts/data/%010d.txt'%frame))
 
+        if prev_imu_data is not None:
+            # 注意 這裡也是個list  # 這裡的 0.1是因為幀數的關係
+            displacement = 0.1 * np.linalg.norm(imu_data[['vf', 'vl']])
+            yaw_change = float(imu_data.yaw - prev_imu_data.yaw)
+            ego_car.update(displacement, yaw_change)
+
+        prev_imu_data = imu_data
+
         # Publish data 
         publish_camera(cam_pub, bridge, image, boxes_2d, types)
         publish_point_cloud(pcl_pub, point_cloud)
@@ -79,10 +109,14 @@ if __name__ == '__main__':
         publish_ego_car(ego_pub)
         publish_imu(imu_pub, imu_data)
         publish_gps(gps_pub, imu_data)
+        publish_loc(loc_pub, ego_car.locations)
 
         rospy.loginfo("published frame %d" %frame)
         rate.sleep()
 
         # frame counter
         frame += 1
-        frame %= 154
+        if frame == 154:
+            frame = 0
+            ego_car.reset()
+        

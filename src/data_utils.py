@@ -9,9 +9,9 @@ import numpy as np
 import pandas as pd
 
 # 定義 IMU 資料的欄位名稱
-IMU_COLUMN_NAMES  = [ 'lat' , 'lon' , 'alt' , 'roll' , 'pitch' , 'yaw' , 'vn' , 've' , 'vf' , 'vl ' , 'vu' , 'ax' , 'ay' , 'az' , 'af' ,
-                    'al' , 'au' , 'wx' , 'wy' , 'wz' , 'wf' , 'wl' , 'wu' , 'posacc' , 'velacc' , 'navstat' , 'numsats' , 'posmode ' ,
-                    'velmode' , 'orimode' ]
+IMU_COLUMN_NAMES  = ['lat', 'lon', 'alt', 'roll', 'pitch', 'yaw', 'vn', 've', 'vf', 'vl', 'vu', 'ax', 'ay', 'az', 'af',
+                    'al', 'au', 'wx', 'wy', 'wz', 'wf', 'wl', 'wu', 'posacc', 'velacc', 'navstat', 'numsats', 'posmode',
+                    'velmode', 'orimode']
 
 # 定義 TRACKING 文件的欄位名稱
 TRACKING_COLUMN_NAMES = ['frame', 'track_id', 'type', 'truncated', 'occluded', 'alpha', 'bbox_left', 'bbox_top',

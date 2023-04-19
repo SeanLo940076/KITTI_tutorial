@@ -10,14 +10,15 @@ import numpy as np
 from std_msgs.msg import Header
 from visualization_msgs.msg import Marker, MarkerArray
 from sensor_msgs.msg import Image, PointCloud2, Imu, NavSatFix
-from geometry_msgs.msg import Point
+from geometry_msgs.msg import Point, Quaternion
 import sensor_msgs.point_cloud2 as pcl2
 from cv_bridge import CvBridge
 import tf
 
 # 定義時間常數與色彩
-FARME_ID = 'map'
-LIFETIME = 0.1
+FRAME_ID = 'map'
+Hz = 10.0
+LIFETIME = 1.0 / Hz 
 DETECTION_COLOR_DICT = {'Car':(255,255,0), 'Pedestrian':(0,226,255), 'Cyclist':(140,40,255)}
 
 # 定義 3D box 框線的連接
@@ -38,7 +39,7 @@ def publish_camera(cam_pub, bridge, image, boxes_2d, types):
 def publish_point_cloud(pcl_pub, point_cloud):
     header = Header()
     header.stamp = rospy.Time.now()
-    header.frame_id = FARME_ID
+    header.frame_id = FRAME_ID
     pcl_pub.publish(pcl2.create_cloud_xyz32(header, point_cloud[:, :3]))
 
 # 發布 3D 框線
@@ -46,7 +47,9 @@ def publish_3dbox(box3d_pub, corners_3d_velos, types, track_ids):
     marker_array = MarkerArray() # define marker's array 可以放入所有的 array
     for i, corners_3d_velo in enumerate(corners_3d_velos):
         marker = Marker()
-        marker.header.frame_id = FARME_ID
+        marker.pose.orientation = Quaternion(0.0, 0.0, 0.0, 1.0) # 初始化四元數 這樣在rviz中不會跳警告
+
+        marker.header.frame_id = FRAME_ID
         marker.header.stamp = rospy.Time.now()
 
         marker.id = i
@@ -76,7 +79,9 @@ def publish_3dbox(box3d_pub, corners_3d_velos, types, track_ids):
         marker_array.markers.append(marker)
 
         text_marker = Marker()
-        text_marker.header.frame_id = FARME_ID
+        text_marker.pose.orientation = Quaternion(0.0, 0.0, 0.0, 1.0) # 初始化四元數 這樣在rviz中不會跳警告
+
+        text_marker.header.frame_id = FRAME_ID
         text_marker.header.stamp = rospy.Time.now()
 
         text_marker.id = i + 1000
@@ -117,12 +122,14 @@ def publish_ego_car(ego_car_pub):
     marker_array = MarkerArray()
 
     marker = Marker()
-    marker.header.frame_id = FARME_ID
+    marker.pose.orientation = Quaternion(0.0, 0.0, 0.0, 1.0) # 初始化四元數 這樣在rviz中不會跳警告
+
+    marker.header.frame_id = FRAME_ID
     marker.header.stamp = rospy.Time.now()
 
     marker.id = 0
     marker.action = Marker.ADD
-    marker.lifetime = rospy.Duration(0)
+    marker.lifetime = rospy.Duration()
     marker.type = Marker.LINE_STRIP
 
     marker.color.r = 0.0
@@ -140,11 +147,12 @@ def publish_ego_car(ego_car_pub):
 
     # 2. 自體車輛3D模型
     mesh_marker = Marker()
-    mesh_marker.header.frame_id = FARME_ID
+    marker.pose.orientation = Quaternion(0.0, 0.0, 0.0, 1.0) # 初始化四元數 這樣在rviz中不會跳警告
+    mesh_marker.header.frame_id = FRAME_ID
     mesh_marker.header.stamp = rospy.Time.now()
 
     mesh_marker.id = -1
-    mesh_marker.lifetime = rospy.Duration(0)
+    mesh_marker.lifetime = rospy.Duration()
     mesh_marker.type = Marker.MESH_RESOURCE
     mesh_marker.mesh_resource = "package://kitti_tutorial/bmw_x5/BMWX54.dae"
 
@@ -175,7 +183,7 @@ def publish_ego_car(ego_car_pub):
 # 發布IMU資料
 def publish_imu(imu_pub, imu_data):
     imu = Imu()
-    imu.header.frame_id = FARME_ID
+    imu.header.frame_id = FRAME_ID
     imu.header.stamp = rospy.Time.now()
 
     # 歐拉角轉四元數
@@ -196,7 +204,7 @@ def publish_imu(imu_pub, imu_data):
 # 發布GPS資料
 def publish_gps(gps_pub, imu_data):
     gps = NavSatFix()
-    gps.header.frame_id = FARME_ID
+    gps.header.frame_id = FRAME_ID
     gps.header.stamp = rospy.Time.now()
 
     gps.latitude = imu_data.lat
@@ -204,3 +212,30 @@ def publish_gps(gps_pub, imu_data):
     gps.altitude = imu_data.alt
 
     gps_pub.publish(gps)
+
+def publish_loc(loc_pub, locations):
+    marker_array = MarkerArray() # define marker's array 可以放入所有的 array
+
+    marker = Marker()
+    marker.pose.orientation = Quaternion(0.0, 0.0, 0.0, 1.0) # 初始化四元數 這樣在rviz中不會跳警告
+    marker.header.frame_id = FRAME_ID
+    marker.header.stamp = rospy.Time.now()
+
+    marker.action = Marker.ADD
+    marker.lifetime = rospy.Duration()
+    marker.type = Marker.LINE_STRIP
+
+    marker.color.r = 1.0
+    marker.color.g = 0.0
+    marker.color.b = 0.0
+    marker.color.a = 1.0
+    marker.scale.x = 0.2
+
+    marker.points = [] # define marker.points
+    # 對於所有在location的點, 將其連起來
+    for p in locations:
+        marker.points.append(Point(p[0], p[1], 0))
+
+    marker_array.markers.append(marker)
+    loc_pub.publish(marker_array)
+
