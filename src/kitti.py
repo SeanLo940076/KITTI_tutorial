@@ -34,17 +34,20 @@ def compute_3d_box_cam2(h, w, l, x, y, z, yaw):
     return corners_3d_cam2
 
 class Object():
-    def __init__(self):
+    def __init__(self, center):
         self.locations = deque(maxlen=20) # 保留最近20幀就好
+        self.locations.appendleft(center) # 
 
-    def update(self, displacement, yaw):
+    def update(self, center, displacement, yaw):
         for i in range(len(self.locations)):
             x0, y0 = self.locations[i]
             x1 = x0 * np.cos(yaw_change) + y0 * np.sin(yaw_change) - displacement # x1 是新的x座標
             y1 = -x0 * np.sin(yaw_change) + y0 * np.cos(yaw_change)
             self.locations[i] = np.array([x1, y1])
 
-        self.locations.appendleft(np.array([0, 0])) # 第一幀永遠是(0, 0) 並且因為是自己的車，所以後面要加上的每一幀都是(0, 0)
+        if center is not None: # 因為有些物件在當前這一幀沒有被偵測到，所以會出現None
+            self.locations.appendleft(center) # 現在不只有自己的車了，還有其他的物體
+        # (舊的)self.locations.appendleft(np.array([0, 0])) # 第一幀永遠是(0, 0) 並且因為是自己的車，所以後面要加上的每一幀都是(0, 0)
 
     def reset(self):
         self.locations = deque(maxlen=20)
@@ -70,7 +73,11 @@ if __name__ == '__main__':
     df_tracking = read_tracking('/home/sean/Documents/KITTI/training/label_02/0000.txt')
     calib = Calibration('/home/sean/Documents/KITTI/2011_09_26_calib/2011_09_26/', from_video=True) 
 
-    ego_car = Object()
+    # ego_car = Object() # 不再是只有自身車體，所以更改為 tracker = {}
+    # tracker = {} 和 centers = {} 的差異，
+    # tracker 是要紀錄所有追蹤的物體，包括過去到現在的這些物體，因為可能物體會被遮擋
+    # centers 是只有紀錄當前這一幀的所有偵測到的物體
+    tracker = {} # track_id : Object  
     prev_imu_data = None
 
     # 在 ROS 中循環發布資料
@@ -84,21 +91,44 @@ if __name__ == '__main__':
         track_ids = np.array(df_tracking_frame['track_id'])
         
         corners_3d_velos = [] # define corners_3d_velos
-        for box_3d in boxes_3d:
+        centers = {} #track_id : center 
+        for track_id, box_3d in zip(track_ids, boxes_3d): # 要知道3D物件的 track_id (每一個物體的ID) 才能
             corners_3d_cam2 = compute_3d_box_cam2(*box_3d)
             corners_3d_velo = calib.project_rect_to_velo(corners_3d_cam2.T) # 8x3 coners array
             corners_3d_velos += [corners_3d_velo]
+            centers[track_id] = np.mean(corners_3d_velo, axis=0)[:2] # 計算8頂點的 axis=0代表 垂直方向取平均 ｜ 指考慮鳥瞰圖方向的中心點 所以z軸 don't care
 
         # Read raw data
         image = read_camera(os.path.join(DATA_PATH, 'image_02/data/%010d.png'%frame))
         point_cloud = read_point_cloud(os.path.join(DATA_PATH, 'velodyne_points/data/%010d.bin'%frame))
         imu_data = read_imu(os.path.join(DATA_PATH, 'oxts/data/%010d.txt'%frame))
 
-        if prev_imu_data is not None:
-            # 注意 這裡也是個list  # 這裡的 0.1是因為幀數的關係
-            displacement = 0.1 * np.linalg.norm(imu_data[['vf', 'vl']])
+        if prev_imu_data is None:       # 當並沒有前一幀的時候(也就是第一幀時)，我們對所有物體都要先建立一個物件，之後才能對這些物件進行更新
+            for track_id in centers:    
+                tracker[track_id] = Object(centers[track_id])    # 所以新建一個Object給它
+        else:
+            # (此註解為舊版本才需要看 之前的程式碼是 使用"+=" 來實現 append的效果)注意 這裡也是個list  # 這裡的 0.1是因為幀數的關係
+            # 首先計算等等會用到的參數，移動量, 角度變化
+            displacement = 0.1 * np.linalg.norm(imu_data[['vf', 'vl']]) 
             yaw_change = float(imu_data.yaw - prev_imu_data.yaw)
-            ego_car.update(displacement, yaw_change)
+            
+            for track_id in centers:
+                # 情境1. 當下偵測到物體的是"已被偵測過的"
+                if track_id in tracker:
+                    # 將物件位置進行更新，並且加上當前偵測到的中心 
+                    tracker[track_id].update(centers[track_id], displacement, yaw_change)
+
+                # 情境2. 當下偵測到物體的以前"沒被偵測過的"
+                else:
+                    tracker[track_id] = Object(centers[track_id])    # 所以新建一個Object給它
+            # 在上述的物體中
+            for track_id in tracker:
+                # 過去有被追蹤到，但這一幀可能被遮擋，沒有偵測到，我們也一樣要進行更新
+                if track_id not in centers:
+                    # 將物件進行更新過去軌跡，但因為不知到當前的中心在那，所以給 None 
+                    tracker[track_id].update(None, displacement, yaw_change)   
+
+            # (舊的)ego_car.update(displacement, yaw_change) # 更新自身車體的距離跟角度
 
         prev_imu_data = imu_data
 
@@ -109,7 +139,8 @@ if __name__ == '__main__':
         publish_ego_car(ego_pub)
         publish_imu(imu_pub, imu_data)
         publish_gps(gps_pub, imu_data)
-        publish_loc(loc_pub, ego_car.locations)
+        # (舊的)publish_loc(loc_pub, ego_car.locations)
+        publish_loc(loc_pub, tracker, centers)
 
         rospy.loginfo("published frame %d" %frame)
         rate.sleep()
@@ -118,5 +149,8 @@ if __name__ == '__main__':
         frame += 1
         if frame == 154:
             frame = 0
-            ego_car.reset()
+            for track_id in tracker:
+                tracker[track_id].reset()
+
+
         

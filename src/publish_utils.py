@@ -213,29 +213,32 @@ def publish_gps(gps_pub, imu_data):
 
     gps_pub.publish(gps)
 
-def publish_loc(loc_pub, locations):
+# (舊的)def publish_loc(loc_pub, locations):
+def publish_loc(loc_pub, tracker, centers):
     marker_array = MarkerArray() # define marker's array 可以放入所有的 array
 
-    marker = Marker()
-    marker.pose.orientation = Quaternion(0.0, 0.0, 0.0, 1.0) # 初始化四元數 這樣在rviz中不會跳警告
-    marker.header.frame_id = FRAME_ID
-    marker.header.stamp = rospy.Time.now()
+    for track_id in centers:
+        marker = Marker()
+        marker.pose.orientation = Quaternion(0.0, 0.0, 0.0, 1.0) # 初始化四元數 這樣在rviz中不會跳警告
+        marker.header.frame_id = FRAME_ID
+        marker.header.stamp = rospy.Time.now()
 
-    marker.action = Marker.ADD
-    marker.lifetime = rospy.Duration()
-    marker.type = Marker.LINE_STRIP
+        marker.action = Marker.ADD
+        marker.lifetime = rospy.Duration(LIFETIME)
+        marker.type = Marker.LINE_STRIP
+        marker.id = track_id
 
-    marker.color.r = 1.0
-    marker.color.g = 0.0
-    marker.color.b = 0.0
-    marker.color.a = 1.0
-    marker.scale.x = 0.2
+        marker.color.r = 1.0
+        marker.color.g = 0.0
+        marker.color.b = 0.0
+        marker.color.a = 1.0
+        marker.scale.x = 0.2
 
-    marker.points = [] # define marker.points
-    # 對於所有在location的點, 將其連起來
-    for p in locations:
-        marker.points.append(Point(p[0], p[1], 0))
+        marker.points = [] # define marker.points
+        # 對於所有在location的點, 將其連起來
+        for p in tracker[track_id].locations:
+            marker.points.append(Point(p[0], p[1], 0))
 
-    marker_array.markers.append(marker)
+        marker_array.markers.append(marker)
     loc_pub.publish(marker_array)
 
