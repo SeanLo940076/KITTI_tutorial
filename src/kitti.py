@@ -97,6 +97,7 @@ if __name__ == '__main__':
             corners_3d_velo = calib.project_rect_to_velo(corners_3d_cam2.T) # 8x3 coners array
             corners_3d_velos += [corners_3d_velo]
             centers[track_id] = np.mean(corners_3d_velo, axis=0)[:2] # 計算8頂點的 axis=0代表 垂直方向取平均 ｜ 指考慮鳥瞰圖方向的中心點 所以z軸 don't care
+        centers[-1] = np.array([0, 0]) # 把自身車體也當成其他物體來看待，但自身都是在(0, 0) 所以位置就設在(0, 0)即可，自身車輛的軌跡就回來了
 
         # Read raw data
         image = read_camera(os.path.join(DATA_PATH, 'image_02/data/%010d.png'%frame))
