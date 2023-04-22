@@ -14,24 +14,12 @@ from collections import deque # google deque
 from data_utils import *
 from publish_utils import *
 from kitti_util import *
+from misc import *
 
 # 設置資料路徑
 DATA_PATH = '/home/sean/Documents/KITTI/2011_09_26_drive_0005_sync/'
-
-# 計算 3D box 在 cam2 坐標系中的位置
-def compute_3d_box_cam2(h, w, l, x, y, z, yaw):
-    """
-    Return : 3xn (n=8) in cam2 coordinate
-    """
-    # R 是旋轉矩陣 (此為繞y軸旋轉)
-    R = np.array([[np.cos(yaw), 0, np.sin(yaw)],[0, 1, 0], [-np.sin(yaw), 0,np.cos(yaw)]])
-    # Ref https://github.com/pratikac/kitti/blob/master/readme.tracking.txt
-    x_corners = [l/2, l/2, -l/2, -l/2,  l/2,  l/2, -l/2, -l/2]
-    y_corners = [0,   0,    0,    0,   -h,   -h,   -h,   -h  ]
-    z_corners = [w/2, -w/2, -w/2, w/2, w/2, -w/2, -w/2, w/2  ]
-    corners_3d_cam2 = np.dot(R, np.vstack([x_corners, y_corners, z_corners]))
-    corners_3d_cam2 += np.vstack([x, y, z])
-    return corners_3d_cam2
+EGOCAR = np.array([[2.15, 0.9, -1.73], [2.15, -0.9, -1.73], [-1.95, -0.9, -1.73], [-1.95, 0.9, -1.73],
+                   [2.15, 0.9, -0.23], [2.15, -0.9, -0.23], [-1.95, -0.9, -0.23], [-1.95, 0.9, -0.23]])
 
 class Object():
     def __init__(self, center):
@@ -65,6 +53,7 @@ if __name__ == '__main__':
     gps_pub = rospy.Publisher('kitti_gps', NavSatFix, queue_size=10)
     box3d_pub = rospy.Publisher('kitti_3d', MarkerArray, queue_size=10)
     loc_pub = rospy.Publisher('kitti_loc', MarkerArray, queue_size=10)
+    dist_pub = rospy.Publisher('kitti_dist', MarkerArray, queue_size=10)
     bridge = CvBridge()
 
     rate = rospy.Rate(10)
@@ -91,12 +80,18 @@ if __name__ == '__main__':
         track_ids = np.array(df_tracking_frame['track_id'])
         
         corners_3d_velos = [] # define corners_3d_velos
-        centers = {} #track_id : center 
+        centers = {} # track_id : center 
+        minPQDs = [] # 那兩個點P, Q ，和最短距離D是多少
         for track_id, box_3d in zip(track_ids, boxes_3d): # 要知道3D物件的 track_id (每一個物體的ID) 才能
             corners_3d_cam2 = compute_3d_box_cam2(*box_3d)
             corners_3d_velo = calib.project_rect_to_velo(corners_3d_cam2.T) # 8x3 coners array
+            # minPQDs 這邊的程式代表著，對於所有物體都計算出他們與自身車體的距離和那兩個點，並且紀錄在list內
+            minPQDs += [min_distance_cuboids(EGOCAR, corners_3d_velo)] # 計算距離的發法寫在 min_distance_cuboids
             corners_3d_velos += [corners_3d_velo]
             centers[track_id] = np.mean(corners_3d_velo, axis=0)[:2] # 計算8頂點的 axis=0代表 垂直方向取平均 ｜ 指考慮鳥瞰圖方向的中心點 所以z軸 don't care
+        corners_3d_velos += [EGOCAR]
+        types = np.append(types,'Car')
+        track_ids = np.append(track_ids, -1)
         centers[-1] = np.array([0, 0]) # 把自身車體也當成其他物體來看待，但自身都是在(0, 0) 所以位置就設在(0, 0)即可，自身車輛的軌跡就回來了
 
         # Read raw data
@@ -142,6 +137,7 @@ if __name__ == '__main__':
         publish_gps(gps_pub, imu_data)
         # (舊的)publish_loc(loc_pub, ego_car.locations)
         publish_loc(loc_pub, tracker, centers)
+        publish_dist(dist_pub, minPQDs)
 
         rospy.loginfo("published frame %d" %frame)
         rate.sleep()

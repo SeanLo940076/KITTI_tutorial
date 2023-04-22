@@ -242,3 +242,59 @@ def publish_loc(loc_pub, tracker, centers):
         marker_array.markers.append(marker)
     loc_pub.publish(marker_array)
 
+def publish_dist(dist_pub, minPQDs):
+    marker_array = MarkerArray()
+    for i, (minP, minQ, minD) in enumerate(minPQDs): # 這邊的功能是劃線連結minP, minQ兩點
+        marker = Marker() 
+        marker.pose.orientation = Quaternion(0.0, 0.0, 0.0, 1.0) # 初始化四元數 這樣在rviz中不會跳警告
+        marker.header.frame_id = FRAME_ID
+        marker.header.stamp = rospy.Time.now()
+
+        marker.action = Marker.ADD
+        marker.lifetime = rospy.Duration(LIFETIME)
+        marker.type = Marker.LINE_STRIP
+        marker.id = i
+
+        marker.color.r = 1.0
+        marker.color.g = 0.0
+        marker.color.b = 1.0
+        marker.color.a = 0.5
+        marker.scale.x = 0.1
+
+        marker.points = [] # define marker.points
+        marker.points.append(Point(minP[0], minP[1], 0))    # 加入要被連接得點P, 點Q 兩點資料
+        marker.points.append(Point(minQ[0], minQ[1], 0))
+
+        marker_array.markers.append(marker)
+
+        text_marker = Marker()                      # 這邊的功能是顯示文字 minP, minQ 兩點的距離是多少公尺
+        text_marker.pose.orientation = Quaternion(0.0, 0.0, 0.0, 1.0) # 初始化四元數 這樣在rviz中不會跳警告
+
+        text_marker.header.frame_id = FRAME_ID
+        text_marker.header.stamp = rospy.Time.now()
+
+        text_marker.id = i + 1000
+        text_marker.action = Marker.ADD
+        text_marker.lifetime = rospy.Duration(LIFETIME)
+        text_marker.type = Marker.TEXT_VIEW_FACING
+
+        p = (minP + minQ) / 2.0
+        text_marker.pose.position.x = p[0]
+        text_marker.pose.position.y = p[1]
+        text_marker.pose.position.z = 0.0
+
+        # text_marker.text = str(i)
+        text_marker.text = '%.2f'%minD
+
+        text_marker.scale.x = 1
+        text_marker.scale.y = 1
+        text_marker.scale.z = 1
+
+        text_marker.color.r = 1.0
+        text_marker.color.g = 1.0
+        text_marker.color.b = 1.0
+        text_marker.color.a = 0.8
+        marker_array.markers.append(text_marker)
+
+    dist_pub.publish(marker_array)
+
