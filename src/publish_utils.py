@@ -229,9 +229,9 @@ def publish_loc(loc_pub, tracker, centers):
         marker.id = track_id
 
         marker.color.r = 1.0
-        marker.color.g = 0.0
+        marker.color.g = 1.0
         marker.color.b = 0.0
-        marker.color.a = 1.0
+        marker.color.a = 0.8
         marker.scale.x = 0.2
 
         marker.points = [] # define marker.points
