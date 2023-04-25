@@ -26,7 +26,7 @@ class Object():
         self.locations = deque(maxlen=20) # 保留最近20幀就好
         self.locations.appendleft(center) # 
 
-    def update(self, center, displacement, yaw):
+    def update(self, center, displacement, yaw_change):
         for i in range(len(self.locations)):
             x0, y0 = self.locations[i]
             x1 = x0 * np.cos(yaw_change) + y0 * np.sin(yaw_change) - displacement # x1 是新的x座標
@@ -54,6 +54,7 @@ if __name__ == '__main__':
     box3d_pub = rospy.Publisher('kitti_3d', MarkerArray, queue_size=10)
     loc_pub = rospy.Publisher('kitti_loc', MarkerArray, queue_size=10)
     dist_pub = rospy.Publisher('kitti_dist', MarkerArray, queue_size=10)
+    other3D_pub = rospy.Publisher('kitti_other3D', MarkerArray, queue_size=10)
     bridge = CvBridge()
 
     rate = rospy.Rate(10)
@@ -82,20 +83,23 @@ if __name__ == '__main__':
         corners_3d_velos = [] # define corners_3d_velos
         centers = {} # track_id : center 
         minPQDs = [] # 那兩個點P, Q ，和最短距離D是多少
+
         for track_id, box_3d in zip(track_ids, boxes_3d): # 要知道3D物件的 track_id (每一個物體的ID) 才能
             corners_3d_cam2 = compute_3d_box_cam2(*box_3d)
             corners_3d_velo = calib.project_rect_to_velo(corners_3d_cam2.T) # 8x3 coners array
             # minPQDs 這邊的程式代表著，對於所有物體都計算出他們與自身車體的距離和那兩個點，並且紀錄在list內
             minPQDs += [min_distance_cuboids(EGOCAR, corners_3d_velo)] # 計算距離的發法寫在 min_distance_cuboids
             corners_3d_velos += [corners_3d_velo]
-            centers[track_id] = np.mean(corners_3d_velo, axis=0)[:2] # 計算8頂點的 axis=0代表 垂直方向取平均 ｜ 指考慮鳥瞰圖方向的中心點 所以z軸 don't care
+            centers[track_id] = np.mean(corners_3d_velo, axis=0)[:2] # 計算8頂點的平均(x,y,z)，接下來放棄z值 axis=0代表 垂直方向取平均 ｜ 指考慮鳥瞰圖方向的中心點 所以z軸 don't care
+        # 設定自身車輛
         corners_3d_velos += [EGOCAR]
         types = np.append(types,'Car')
         track_ids = np.append(track_ids, -1)
         centers[-1] = np.array([0, 0]) # 把自身車體也當成其他物體來看待，但自身都是在(0, 0) 所以位置就設在(0, 0)即可，自身車輛的軌跡就回來了
 
         # Read raw data
-        image = read_camera(os.path.join(DATA_PATH, 'image_02/data/%010d.png'%frame))
+        # %010d 是一个占位符，用于将 frame 转换为一个 10 位的零填充整数。例如，如果 frame 是 42，那么生成的文件名将是 0000000042.png。
+        image = read_camera(os.path.join(DATA_PATH, 'image_02/data/%010d.png'%frame)) 
         point_cloud = read_point_cloud(os.path.join(DATA_PATH, 'velodyne_points/data/%010d.bin'%frame))
         imu_data = read_imu(os.path.join(DATA_PATH, 'oxts/data/%010d.txt'%frame))
 
@@ -114,7 +118,7 @@ if __name__ == '__main__':
                     # 將物件位置進行更新，並且加上當前偵測到的中心 
                     tracker[track_id].update(centers[track_id], displacement, yaw_change)
 
-                # 情境2. 當下偵測到物體的以前"沒被偵測過的"
+                # 情境2. 當下偵測到的物體是以前"沒被偵測過的"
                 else:
                     tracker[track_id] = Object(centers[track_id])    # 所以新建一個Object給它
             # 在上述的物體中
@@ -138,7 +142,8 @@ if __name__ == '__main__':
         # (舊的)publish_loc(loc_pub, ego_car.locations)
         publish_loc(loc_pub, tracker, centers)
         publish_dist(dist_pub, minPQDs)
-
+        publish_other3D(other3D_pub, tracker, centers, types)
+        # publish_other3D(other3D_pub, corners_3d_velos, types, track_ids)
         rospy.loginfo("published frame %d" %frame)
         rate.sleep()
 

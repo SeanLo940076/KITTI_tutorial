@@ -54,7 +54,7 @@ def publish_3dbox(box3d_pub, corners_3d_velos, types, track_ids):
 
         marker.id = i
         marker.action = Marker.ADD
-        marker.lifetime = rospy.Duration(LIFETIME)
+        marker.lifetime = rospy.Duration(LIFETIME) # LIFETIME
         marker.type = Marker.LINE_LIST
 
         # if types is None:
@@ -213,7 +213,7 @@ def publish_gps(gps_pub, imu_data):
 
     gps_pub.publish(gps)
 
-# (舊的)def publish_loc(loc_pub, locations):
+# 發布所有物件的位置資料
 def publish_loc(loc_pub, tracker, centers):
     marker_array = MarkerArray() # define marker's array 可以放入所有的 array
 
@@ -242,6 +242,7 @@ def publish_loc(loc_pub, tracker, centers):
         marker_array.markers.append(marker)
     loc_pub.publish(marker_array)
 
+# 發布車體與其他物件的最短距離與連接線
 def publish_dist(dist_pub, minPQDs):
     marker_array = MarkerArray()
     for i, (minP, minQ, minD) in enumerate(minPQDs): # 這邊的功能是劃線連結minP, minQ兩點
@@ -297,4 +298,58 @@ def publish_dist(dist_pub, minPQDs):
         marker_array.markers.append(text_marker)
 
     dist_pub.publish(marker_array)
+
+# 發布其他車輛的3D模型
+def publish_other3D(other3D_pub, tracker, centers, types):
+    """
+    Publish other car model mesh
+    """
+    # 別的車輛3D模型
+    marker_array = MarkerArray() # define marker's array 可以放入所有的 array
+
+    for tpy, track_id in zip(types, centers):
+        if track_id >= 0:
+            other3D_marker = Marker()
+            other3D_marker.pose.orientation = Quaternion(0.0, 0.0, 0.0, 1.0) # 初始化四元數 這樣在rviz中不會跳警告
+            other3D_marker.header.frame_id = FRAME_ID
+            other3D_marker.header.stamp = rospy.Time.now()
+
+            other3D_marker.id = track_id + 2000
+            other3D_marker.action = Marker.ADD
+            other3D_marker.lifetime = rospy.Duration(LIFETIME) # LIFETIME
+            other3D_marker.type = Marker.MESH_RESOURCE
+            if tpy == 'Car':
+                other3D_marker.mesh_resource = "package://kitti_tutorial/bmw_x5/BMWX54.dae"
+            elif tpy == 'Pedestrian':
+                other3D_marker.mesh_resource = "package://kitti_tutorial/BodyMesh/Bodymesh.dae"
+            else:
+                other3D_marker.mesh_resource = "package://kitti_tutorial/Wheelbarrow/wheelbarrow.dae"
+
+            # for p in tracker[track_id].locations:
+
+            (other3D_marker.pose.position.x, other3D_marker.pose.position.y) = centers[track_id]
+            other3D_marker.pose.position.z = -1.73
+
+            q = tf.transformations.quaternion_from_euler(np.pi/2, 0, np.pi)
+            other3D_marker.pose.orientation.x = q[0]
+            other3D_marker.pose.orientation.y = q[1]
+            other3D_marker.pose.orientation.z = q[2]
+            other3D_marker.pose.orientation.w = q[3]
+
+            b, g, r =  DETECTION_COLOR_DICT[tpy]
+            other3D_marker.color.r = r/255.0
+            other3D_marker.color.g = g/255.0
+            other3D_marker.color.b = b/255.0
+
+            # other3D_marker.color.r = 1.0
+            # other3D_marker.color.g = 1.0
+            # other3D_marker.color.b = 1.0
+            other3D_marker.color.a = 1.0
+
+            other3D_marker.scale.x = 0.9
+            other3D_marker.scale.y = 0.9
+            other3D_marker.scale.z = 0.9
+
+            marker_array.markers.append(other3D_marker)
+    other3D_pub.publish(marker_array)
 
