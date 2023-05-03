@@ -320,13 +320,13 @@ def publish_other3D(other3D_pub, tracker, centers, types):
             other3D_marker.type = Marker.MESH_RESOURCE
             if tpy == 'Car':
                 other3D_marker.mesh_resource = "package://kitti_tutorial/bmw_x5/BMWX54.dae"
-                q = tf.transformations.quaternion_from_euler(np.pi/2, 0, np.pi)
+                q = tf.transformations.quaternion_from_euler(np.pi/2, 0, np.pi)     # 初始角度校正
                 other3D_marker.pose.orientation.x = q[0]
                 other3D_marker.pose.orientation.y = q[1]
                 other3D_marker.pose.orientation.z = q[2]
                 other3D_marker.pose.orientation.w = q[3]
 
-                other3D_marker.scale.x = 0.9
+                other3D_marker.scale.x = 0.9                    # 縮放比例
                 other3D_marker.scale.y = 0.9
                 other3D_marker.scale.z = 0.9
 
@@ -334,51 +334,38 @@ def publish_other3D(other3D_pub, tracker, centers, types):
 
             elif tpy == 'Pedestrian':
                 other3D_marker.mesh_resource = "package://kitti_tutorial/BodyMesh/Bodymesh.dae"
-                q = tf.transformations.quaternion_from_euler(0, 0, 0)
+                q = tf.transformations.quaternion_from_euler(0, 0, 0)               # 初始角度校正
                 other3D_marker.pose.orientation.x = q[0]
                 other3D_marker.pose.orientation.y = q[1]
                 other3D_marker.pose.orientation.z = q[2]
                 other3D_marker.pose.orientation.w = q[3]
 
-                other3D_marker.scale.x = 1.5
-                other3D_marker.scale.y = 1.5
-                other3D_marker.scale.z = 1.5
+                other3D_marker.scale.x = 0.3                    # 縮放比例
+                other3D_marker.scale.y = 0.3
+                other3D_marker.scale.z = 0.3
 
-                other3D_marker.pose.position.z = 0
+                other3D_marker.pose.position.z = -0.5
             else:
                 other3D_marker.mesh_resource = "package://kitti_tutorial/Wheelbarrow/wheelbarrow.dae"
-                q = tf.transformations.quaternion_from_euler(0, 0, 0)
+                q = tf.transformations.quaternion_from_euler(np.pi/2, 0, np.pi/2)   # 初始角度校正
                 other3D_marker.pose.orientation.x = q[0]
                 other3D_marker.pose.orientation.y = q[1]
                 other3D_marker.pose.orientation.z = q[2]
                 other3D_marker.pose.orientation.w = q[3]
 
-                other3D_marker.scale.x = 0.2
-                other3D_marker.scale.y = 0.2
-                other3D_marker.scale.z = 0.2
+                other3D_marker.scale.x = 1                      # 縮放比例
+                other3D_marker.scale.y = 1
+                other3D_marker.scale.z = 1
 
-                other3D_marker.pose.position.z = 0
-
-            # for p in tracker[track_id].locations:
+                other3D_marker.pose.position.z = -1.73
 
             (other3D_marker.pose.position.x, other3D_marker.pose.position.y) = centers[track_id]
-            # other3D_marker.pose.position.z = -1.73
 
-            # q = tf.transformations.quaternion_from_euler(np.pi/2, 0, np.pi)
-            # other3D_marker.pose.orientation.x = q[0]
-            # other3D_marker.pose.orientation.y = q[1]
-            # other3D_marker.pose.orientation.z = q[2]
-            # other3D_marker.pose.orientation.w = q[3]
-
-            b, g, r =  DETECTION_COLOR_DICT[tpy]
+            b, g, r =  DETECTION_COLOR_DICT[tpy]                # 物體顏色相符
             other3D_marker.color.r = r/255.0
             other3D_marker.color.g = g/255.0
             other3D_marker.color.b = b/255.0
-            other3D_marker.color.a = 1.0
-
-            # other3D_marker.scale.x = 0.5
-            # other3D_marker.scale.y = 0.5
-            # other3D_marker.scale.z = 0.5
+            other3D_marker.color.a = 1.0                        # 物體透明度
 
             marker_array.markers.append(other3D_marker)
     other3D_pub.publish(marker_array)
